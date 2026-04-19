@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ジャーナリングタイマー</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Inter', sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: #f8fafc;
+            padding: 20px;
+            transition: background 2s ease;
+        }
+
+        .timer-container {
+            background: #ffffff;
+            border: 1px solid rgba(148, 163, 184, 0.2);
+            border-radius: 16px;
+            padding: 2rem 2.5rem;
+            display: flex;
+            align-items: center;
+            gap: 2.5rem;
+            max-width: 600px;
+            width: 100%;
+            transition: background 2s ease;
+        }
+
+        .circle-side {
+            flex-shrink: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .timer-circle {
+            width: 160px;
+            height: 160px;
+            border-radius: 50%;
+            background: conic-gradient(#6366f1 0deg, #e2e8f0 0deg);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .timer-inner {
+            width: 122px;
+            height: 122px;
+            background: #ffffff;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid rgba(148, 163, 184, 0.2);
+        }
+
+        .time-display {
+            font-size: 26px;
+            font-weight: 500;
+            color: #1e293b;
+            font-variant-numeric: tabular-nums;
+            letter-spacing: -0.02em;
+        }
+
+        .info-side {
+            flex: 1;
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .title {
+            font-size: 16px;
+            font-weight: 500;
+            color: #1e293b;
+            margin-bottom: 2px;
+        }
+
+        .phase-indicator {
+            font-size: 13px;
+            color: #64748b;
+            line-height: 1.5;
+        }
+
+        .time-selector {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            transition: opacity 0.3s ease;
+        }
+
+        .time-selector label {
+            font-size: 13px;
+            color: #64748b;
+            white-space: nowrap;
+        }
+
+        .time-selector.hidden {
+            opacity: 0.4;
+            pointer-events: none;
+        }
+
+        input[type="number"] {
+            width: 72px;
+            font-size: 14px;
+            font-weight: 500;
+            text-align: center;
+            padding: 6px 10px;
+            border: 1px solid rgba(148, 163, 184, 0.4);
+            border-radius: 8px;
+            background: #ffffff;
+            color: #1e293b;
+            font-family: inherit;
+        }
+
+        input[type="number"]:focus {
+            outline: none;
+            border-color: rgba(99, 102, 241, 0.4);
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+        }
+
+        .controls {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        button {
+            flex: 1;
+            min-width: 80px;
+            font-size: 14px;
+            font-weight: 500;
+            padding: 9px 16px;
+            border-radius: 8px;
+            border: 1px solid rgba(148, 163, 184, 0.3);
+            background: #ffffff;
+            color: #475569;
+            cursor: pointer;
+            font-family: inherit;
+            transition: all 0.15s ease;
+        }
+
+        button:hover {
+            background: #f8fafc;
+            border-color: rgba(148, 163, 184, 0.5);
+            transform: translateY(-1px);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        .status {
+            font-size: 13px;
+            color: #64748b;
+        }
+    </style>
+</head>
+<body>
+    <div class="timer-container" id="timerContainer">
+
+        <div class="circle-side">
+            <div class="timer-circle" id="timerCircle">
+                <div class="timer-inner">
+                    <span class="time-display" id="timeDisplay">10:00</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="info-side">
+            <div>
+                <div class="title">ジャーナリングタイマー</div>
+                <div class="phase-indicator" id="phaseIndicator">深呼吸をして準備を整えましょう</div>
+            </div>
+
+            <div class="time-selector" id="timeSelector">
+                <label for="timeInput">時間（分）</label>
+                <input type="number" id="timeInput" value="10" min="1" max="60" onchange="updateTimeSettings()">
+            </div>
+
+            <div class="controls">
+                <button onclick="startTimer()">スタート</button>
+                <button onclick="stopTimer()">ストップ</button>
+                <button onclick="resetTimer()">リセット</button>
+            </div>
+
+            <div class="status" id="status">準備完了</div>
+        </div>
+
+    </div>
+
+    <script>
+        let timerInterval;
+        let timeRemaining = 600;
+        let isRunning = false;
+        let totalTime = 600;
+
+        const timeDisplay = document.getElementById('timeDisplay');
+        const timerCircle = document.getElementById('timerCircle');
+        const statusEl = document.getElementById('status');
+        const phaseIndicator = document.getElementById('phaseIndicator');
+        const timeInput = document.getElementById('timeInput');
+        const timeSelector = document.getElementById('timeSelector');
+        const timerContainer = document.getElementById('timerContainer');
+
+        function formatTime(seconds) {
+            const m = Math.floor(seconds / 60);
+            const s = seconds % 60;
+            return m + ':' + String(s).padStart(2, '0');
+        }
+
+        function updateTimeSettings() {
+            if (!isRunning) {
+                const minutes = parseInt(timeInput.value) || 10;
+                totalTime = minutes * 60;
+                timeRemaining = totalTime;
+                updateDisplay();
+            }
+        }
+
+        function updateDisplay() {
+            timeDisplay.textContent = formatTime(timeRemaining);
+            const progress = ((totalTime - timeRemaining) / totalTime) * 360;
+            timerCircle.style.background = 'conic-gradient(#6366f1 ' + progress + 'deg, #e2e8f0 ' + progress + 'deg)';
+            updatePhase();
+        }
+
+        function updatePhase() {
+            const p = (totalTime - timeRemaining) / totalTime;
+            updateBg(p);
+            if (p < 0.25) phaseIndicator.textContent = '心を静めて、思考を整理しましょう';
+            else if (p < 0.5) phaseIndicator.textContent = '自由に思考を流れるままに表現してください';
+            else if (p < 0.75) phaseIndicator.textContent = '深い洞察や気づきを大切に記録しましょう';
+            else if (p < 1) phaseIndicator.textContent = 'もうすぐ完了です。最後の思考をまとめましょう';
+        }
+
+        function interpolateColor(c1, c2, f) {
+            const h1 = c1.replace('#', ''), h2 = c2.replace('#', '');
+            const r = Math.round(parseInt(h1.substr(0,2),16) + (parseInt(h2.substr(0,2),16) - parseInt(h1.substr(0,2),16)) * f);
+            const g = Math.round(parseInt(h1.substr(2,2),16) + (parseInt(h2.substr(2,2),16) - parseInt(h1.substr(2,2),16)) * f);
+            const b = Math.round(parseInt(h1.substr(4,2),16) + (parseInt(h2.substr(4,2),16) - parseInt(h1.substr(4,2),16)) * f);
+            return '#' + r.toString(16).padStart(2,'0') + g.toString(16).padStart(2,'0') + b.toString(16).padStart(2,'0');
+        }
+
+        function updateBg(p) {
+            let top, bot;
+            if (p <= 0.33) {
+                const lp = p / 0.33;
+                top = interpolateColor('#f8fafc', '#f0f9ff', lp);
+                bot = interpolateColor('#e2e8f0', '#e0f2fe', lp);
+            } else if (p <= 0.66) {
+                const lp = (p - 0.33) / 0.33;
+                top = interpolateColor('#f0f9ff', '#fffbeb', lp);
+                bot = interpolateColor('#e0f2fe', '#fef3c7', lp);
+            } else {
+                const lp = (p - 0.66) / 0.34;
+                top = interpolateColor('#fffbeb', '#f0fdf4', lp);
+                bot = interpolateColor('#fef3c7', '#dcfce7', lp);
+            }
+            document.body.style.background = 'linear-gradient(135deg, ' + top + ' 0%, ' + bot + ' 100%)';
+            timerContainer.style.background = 'rgba(255,255,255,0.85)';
+        }
+
+        function startTimer() {
+            if (!isRunning) {
+                isRunning = true;
+                statusEl.textContent = 'ジャーナリング中';
+                timeInput.disabled = true;
+                timeSelector.classList.add('hidden');
+                timerInterval = setInterval(() => {
+                    timeRemaining--;
+                    updateDisplay();
+                    if (timeRemaining <= 0) completeTimer();
+                }, 1000);
+            }
+        }
+
+        function stopTimer() {
+            if (isRunning) {
+                isRunning = false;
+                clearInterval(timerInterval);
+                statusEl.textContent = '一時停止';
+                phaseIndicator.textContent = '再開の準備ができたらスタートを押してください';
+            }
+        }
+
+        function resetTimer() {
+            isRunning = false;
+            clearInterval(timerInterval);
+            timeInput.disabled = false;
+            timeSelector.classList.remove('hidden');
+            const minutes = parseInt(timeInput.value) || 10;
+            totalTime = minutes * 60;
+            timeRemaining = totalTime;
+            updateDisplay();
+            statusEl.textContent = '準備完了';
+            phaseIndicator.textContent = '深呼吸をして準備を整えましょう';
+            document.body.style.background = '#f8fafc';
+            timerContainer.style.background = '#ffffff';
+        }
+
+        function completeTimer() {
+            isRunning = false;
+            clearInterval(timerInterval);
+            statusEl.textContent = '完了';
+            phaseIndicator.textContent = '素晴らしいジャーナリングでした。お疲れさまでした';
+            timeInput.disabled = false;
+            timeSelector.classList.remove('hidden');
+            playCompletionSound();
+        }
+
+        function playCompletionSound() {
+            try {
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                [440, 523.25, 659.25, 783.99].forEach((freq, i) => {
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.connect(gain); gain.connect(ctx.destination);
+                    osc.frequency.setValueAtTime(freq, ctx.currentTime);
+                    osc.type = 'sine';
+                    const d = i * 0.15, v = 0.08 - i * 0.015;
+                    gain.gain.setValueAtTime(0, ctx.currentTime + d);
+                    gain.gain.linearRampToValueAtTime(v, ctx.currentTime + d + 0.2);
+                    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + d + 2.5);
+                    osc.start(ctx.currentTime + d);
+                    osc.stop(ctx.currentTime + d + 2.5);
+                });
+            } catch(e) {}
+        }
+
+        updateDisplay();
+    </script>
+</body>
+</html>
